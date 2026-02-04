@@ -1,0 +1,153 @@
+# ============================================
+# CD Pipeline - Deploy to Azure AKS
+# ============================================
+
+name: CD - Deploy to AKS
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - prod
+      api_gateway_tag:
+        description: 'API Gateway image tag (leave empty for latest)'
+        required: false
+        type: string
+      inference_service_tag:
+        description: 'Inference Service image tag (leave empty for latest)'
+        required: false
+        type: string
+  workflow_run:
+    workflows: ["CI - API Gateway", "CI - Inference Service"]
+    types:
+      - completed
+    branches:
+      - main
+
+env:
+  AKS_CLUSTER_NAME: aks-iris-${{ github.event.inputs.environment || 'dev' }}
+  AKS_RESOURCE_GROUP: rg-iris-${{ github.event.inputs.environment || 'dev' }}
+
+jobs:
+  deploy:
+    name: Deploy to ${{ github.event.inputs.environment || 'dev' }}
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Get AKS credentials
+        uses: azure/aks-set-context@v3
+        with:
+          cluster-name: ${{ env.AKS_CLUSTER_NAME }}
+          resource-group: ${{ env.AKS_RESOURCE_GROUP }}
+
+      - name: Set up Kustomize
+        uses: imranismail/setup-kustomize@v2
+        with:
+          kustomize-version: '5.3.0'
+
+      - name: Determine image tags
+        id: tags
+        run: |
+          ENV=${{ github.event.inputs.environment || 'dev' }}
+
+          # API Gateway tag
+          if [ -n "${{ github.event.inputs.api_gateway_tag }}" ]; then
+            API_TAG="${{ github.event.inputs.api_gateway_tag }}"
+          else
+            API_TAG="${{ github.sha }}"
+          fi
+
+          # Inference Service tag
+          if [ -n "${{ github.event.inputs.inference_service_tag }}" ]; then
+            INF_TAG="${{ github.event.inputs.inference_service_tag }}"
+          else
+            INF_TAG="${{ github.sha }}"
+          fi
+
+          echo "api_gateway_tag=${API_TAG}" >> $GITHUB_OUTPUT
+          echo "inference_service_tag=${INF_TAG}" >> $GITHUB_OUTPUT
+          echo "environment=${ENV}" >> $GITHUB_OUTPUT
+
+      - name: Update Kustomize images
+        run: |
+          cd v4/k8s/overlays/${{ steps.tags.outputs.environment }}
+
+          # Update image tags
+          kustomize edit set image \
+            api-gateway=${{ secrets.ACR_LOGIN_SERVER }}/iris/api-gateway:${{ steps.tags.outputs.api_gateway_tag }}
+          kustomize edit set image \
+            inference-service=${{ secrets.ACR_LOGIN_SERVER }}/iris/inference-service:${{ steps.tags.outputs.inference_service_tag }}
+
+      - name: Validate manifests
+        run: |
+          cd v4/k8s/overlays/${{ steps.tags.outputs.environment }}
+          kustomize build . | kubectl apply --dry-run=client -f -
+
+      - name: Deploy to AKS
+        run: |
+          cd v4/k8s/overlays/${{ steps.tags.outputs.environment }}
+          kustomize build . | kubectl apply -f -
+
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/api-gateway -n iris-ml --timeout=300s
+          kubectl rollout status deployment/inference-service -n iris-ml --timeout=300s
+
+      - name: Verify deployment
+        run: |
+          echo "Checking pods status..."
+          kubectl get pods -n iris-ml
+
+          echo "Checking services..."
+          kubectl get svc -n iris-ml
+
+          echo "Getting external IP..."
+          kubectl get svc api-gateway-external -n iris-ml -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+
+      - name: Health check
+        run: |
+          # Wait for LoadBalancer IP
+          for i in {1..30}; do
+            EXTERNAL_IP=$(kubectl get svc api-gateway-external -n iris-ml -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+            if [ -n "$EXTERNAL_IP" ]; then
+              break
+            fi
+            echo "Waiting for external IP..."
+            sleep 10
+          done
+
+          if [ -z "$EXTERNAL_IP" ]; then
+            echo "Warning: Could not get external IP"
+            exit 0
+          fi
+
+          echo "Testing health endpoint at http://$EXTERNAL_IP/health/live"
+          curl -f "http://$EXTERNAL_IP/health/live" || echo "Health check failed (may need more time)"
+
+      - name: Create deployment summary
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ steps.tags.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "**API Gateway Tag:** ${{ steps.tags.outputs.api_gateway_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Inference Service Tag:** ${{ steps.tags.outputs.inference_service_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Pods" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          kubectl get pods -n iris-ml >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

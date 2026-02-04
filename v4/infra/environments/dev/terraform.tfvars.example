@@ -1,0 +1,11 @@
+# ============================================
+# Development Environment - Example Variables
+# Copy to terraform.tfvars and update values
+# ============================================
+
+location = "eastus"
+api_key  = "your-api-key-here"
+
+alert_email_addresses = [
+  "dev-team@example.com"
+]

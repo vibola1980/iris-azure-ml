@@ -1,0 +1,19 @@
+# ============================================
+# Production Environment - Example Variables
+# Copy to terraform.tfvars and update values
+# ============================================
+
+location = "eastus"
+api_key  = "your-secure-api-key-here"
+
+alert_email_addresses = [
+  "ops-team@example.com",
+  "ml-team@example.com"
+]
+
+enable_private_endpoints = true
+enable_azure_ad_rbac     = true
+
+admin_group_object_ids = [
+  "00000000-0000-0000-0000-000000000000"  # Replace with actual Azure AD group ID
+]

@@ -1,0 +1,115 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: iris-ml
+
+resources:
+  - ../../base
+  - external-secret.yaml
+
+commonLabels:
+  environment: prod
+
+# Image configuration for prod
+images:
+  - name: api-gateway
+    newName: acririsprod.azurecr.io/iris/api-gateway
+    # newTag is set dynamically during deployment
+  - name: inference-service
+    newName: acririsprod.azurecr.io/iris/inference-service
+    # newTag is set dynamically during deployment
+
+# Patches for prod environment
+patches:
+  # Production replicas
+  - target:
+      kind: Deployment
+      name: api-gateway
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 3
+  - target:
+      kind: Deployment
+      name: inference-service
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 3
+  # Production resource limits
+  - target:
+      kind: Deployment
+      name: api-gateway
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: 500m
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: 512Mi
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: "1"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: 1Gi
+  - target:
+      kind: Deployment
+      name: inference-service
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: 500m
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: 512Mi
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: "1"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: 1Gi
+  # Production HPA settings
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: api-gateway
+    patch: |
+      - op: replace
+        path: /spec/minReplicas
+        value: 3
+      - op: replace
+        path: /spec/maxReplicas
+        value: 10
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: inference-service
+    patch: |
+      - op: replace
+        path: /spec/minReplicas
+        value: 3
+      - op: replace
+        path: /spec/maxReplicas
+        value: 10
+  # Production PDB
+  - target:
+      kind: PodDisruptionBudget
+      name: api-gateway
+    patch: |
+      - op: replace
+        path: /spec/minAvailable
+        value: 2
+  - target:
+      kind: PodDisruptionBudget
+      name: inference-service
+    patch: |
+      - op: replace
+        path: /spec/minAvailable
+        value: 2
+
+# ConfigMap patches for prod
+configMapGenerator:
+  - name: model-config
+    behavior: merge
+    literals:
+      - STORAGE_ACCOUNT=stirisprod
+      - MODEL_VERSION=1.0.0

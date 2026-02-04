@@ -1,0 +1,76 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: iris-ml
+
+resources:
+  - ../../base
+  - secrets.yaml
+
+commonLabels:
+  environment: dev
+
+# Image configuration for dev
+images:
+  - name: api-gateway
+    newName: acririsdev.azurecr.io/iris/api-gateway
+    newTag: latest
+  - name: inference-service
+    newName: acririsdev.azurecr.io/iris/inference-service
+    newTag: latest
+
+# Patches for dev environment
+patches:
+  # Reduce replicas for dev
+  - target:
+      kind: Deployment
+      name: api-gateway
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  - target:
+      kind: Deployment
+      name: inference-service
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  # Reduce HPA min replicas
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: api-gateway
+    patch: |
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: inference-service
+    patch: |
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+  # Reduce PDB for dev
+  - target:
+      kind: PodDisruptionBudget
+      name: api-gateway
+    patch: |
+      - op: replace
+        path: /spec/minAvailable
+        value: 0
+  - target:
+      kind: PodDisruptionBudget
+      name: inference-service
+    patch: |
+      - op: replace
+        path: /spec/minAvailable
+        value: 1
+
+# ConfigMap patches for dev
+configMapGenerator:
+  - name: model-config
+    behavior: merge
+    literals:
+      - STORAGE_ACCOUNT=stirisdev
+      - MODEL_VERSION=1.0.0-dev
