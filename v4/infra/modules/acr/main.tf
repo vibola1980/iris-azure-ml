@@ -10,7 +10,7 @@ resource "azurerm_container_registry" "main" {
   sku                 = var.sku
   admin_enabled       = var.admin_enabled
 
-  # Premium features
+  # Premium features - geo-replication
   dynamic "georeplications" {
     for_each = var.sku == "Premium" ? var.georeplications : []
     content {
@@ -20,29 +20,8 @@ resource "azurerm_container_registry" "main" {
     }
   }
 
-  # Network rules (Premium only)
-  dynamic "network_rule_set" {
-    for_each = var.sku == "Premium" && var.enable_network_rules ? [1] : []
-    content {
-      default_action = "Deny"
-
-      dynamic "ip_rule" {
-        for_each = var.allowed_ip_ranges
-        content {
-          action   = "Allow"
-          ip_range = ip_rule.value
-        }
-      }
-
-      dynamic "virtual_network" {
-        for_each = var.allowed_subnet_ids
-        content {
-          action    = "Allow"
-          subnet_id = virtual_network.value
-        }
-      }
-    }
-  }
+  # Network rules removido - usar Private Endpoints para seguranca
+  # SKU Standard nao suporta network rules
 
   tags = var.tags
 }

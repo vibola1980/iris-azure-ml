@@ -11,6 +11,10 @@ terraform {
       source  = "hashicorp/azurerm"
       version = "~> 3.85"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.5"
+    }
   }
 
   # Backend configuration (uncomment for remote state)
@@ -30,11 +34,19 @@ provider "azurerm" {
   }
 }
 
+# Random suffix for globally unique names
+resource "random_string" "suffix" {
+  length  = 6
+  special = false
+  upper   = false
+}
+
 # Local variables
 locals {
-  project_name = "iris"
-  environment  = "prod"
-  location     = var.location
+  project_name  = "iris"
+  environment   = "prod"
+  location      = var.location
+  unique_suffix = random_string.suffix.result
 
   tags = {
     Project     = "iris-ml-v4"
@@ -42,6 +54,9 @@ locals {
     ManagedBy   = "terraform"
   }
 }
+
+# Current user/service principal for Terraform
+data "azurerm_client_config" "current" {}
 
 # Resource Group
 resource "azurerm_resource_group" "main" {
@@ -109,6 +124,7 @@ module "storage" {
   environment         = local.environment
   location            = local.location
   resource_group_name = azurerm_resource_group.main.name
+  name_suffix         = local.unique_suffix
 
   account_tier              = "Standard"
   replication_type          = "GRS"
@@ -130,6 +146,7 @@ module "keyvault" {
   environment         = local.environment
   location            = local.location
   resource_group_name = azurerm_resource_group.main.name
+  name_suffix         = local.unique_suffix
 
   enable_rbac_authorization  = true
   purge_protection_enabled   = true
@@ -146,6 +163,13 @@ module "keyvault" {
   tags = local.tags
 }
 
+# Grant Terraform user access to Key Vault secrets
+resource "azurerm_role_assignment" "terraform_keyvault_secrets" {
+  scope                = module.keyvault.id
+  role_definition_name = "Key Vault Secrets Officer"
+  principal_id         = data.azurerm_client_config.current.object_id
+}
+
 # AKS Cluster
 module "aks" {
   source = "../../modules/aks"
@@ -155,7 +179,7 @@ module "aks" {
   location            = local.location
   resource_group_name = azurerm_resource_group.main.name
 
-  kubernetes_version  = "1.28"
+  kubernetes_version  = "1.32"
   system_node_vm_size = "Standard_D2s_v3"
   system_node_count   = 3
   enable_autoscaling  = true
@@ -176,6 +200,7 @@ module "aks" {
   subnet_id                  = module.networking.aks_subnet_id
   log_analytics_workspace_id = module.monitoring.log_analytics_workspace_id
   acr_id                     = module.acr.id
+  enable_acr_integration     = true
 
   tags = local.tags
 }

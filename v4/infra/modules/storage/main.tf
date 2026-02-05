@@ -4,7 +4,7 @@
 # ============================================
 
 resource "azurerm_storage_account" "main" {
-  name                     = replace("st${var.project_name}${var.environment}", "-", "")
+  name                     = replace("st${var.project_name}${var.environment}${var.name_suffix}", "-", "")
   resource_group_name      = var.resource_group_name
   location                 = var.location
   account_tier             = var.account_tier
@@ -13,7 +13,7 @@ resource "azurerm_storage_account" "main" {
 
   # Security settings
   min_tls_version                 = "TLS1_2"
-  enable_https_traffic_only       = true
+  https_traffic_only_enabled      = true
   allow_nested_items_to_be_public = false
   shared_access_key_enabled       = var.enable_shared_access_key
 

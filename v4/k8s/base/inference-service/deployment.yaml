@@ -32,60 +32,6 @@ spec:
         runAsNonRoot: true
         runAsUser: 1000
         fsGroup: 1000
-      # Init container to download model from Azure Blob Storage
-      initContainers:
-        - name: download-model
-          image: mcr.microsoft.com/azure-cli:latest
-          command:
-            - /bin/sh
-            - -c
-            - |
-              set -e
-              echo "Downloading model from Azure Blob Storage..."
-
-              STORAGE_ACCOUNT=${STORAGE_ACCOUNT}
-              STORAGE_CONTAINER=${STORAGE_CONTAINER}
-              MODEL_BLOB_NAME=${MODEL_BLOB_NAME}
-              MODEL_PATH="/app/models/model.pkl"
-
-              if [ -z "$STORAGE_ACCOUNT" ]; then
-                echo "STORAGE_ACCOUNT not set, skipping download"
-                exit 0
-              fi
-
-              # Download using managed identity (no credentials needed)
-              az storage blob download \
-                --account-name "$STORAGE_ACCOUNT" \
-                --container-name "$STORAGE_CONTAINER" \
-                --name "$MODEL_BLOB_NAME" \
-                --file "$MODEL_PATH" \
-                --auth-mode login
-
-              echo "Model downloaded successfully to $MODEL_PATH"
-              ls -la /app/models/
-          env:
-            - name: STORAGE_ACCOUNT
-              valueFrom:
-                configMapKeyRef:
-                  name: model-config
-                  key: STORAGE_ACCOUNT
-            - name: STORAGE_CONTAINER
-              valueFrom:
-                configMapKeyRef:
-                  name: model-config
-                  key: STORAGE_CONTAINER
-            - name: MODEL_BLOB_NAME
-              valueFrom:
-                configMapKeyRef:
-                  name: model-config
-                  key: MODEL_BLOB_NAME
-          volumeMounts:
-            - name: model-storage
-              mountPath: /app/models
-          securityContext:
-            allowPrivilegeEscalation: false
-            runAsNonRoot: true
-            runAsUser: 1000
       containers:
         - name: inference-service
           image: inference-service:latest
@@ -141,14 +87,9 @@ spec:
               drop:
                 - ALL
           volumeMounts:
-            - name: model-storage
-              mountPath: /app/models
-              readOnly: true
             - name: tmp
               mountPath: /tmp
       volumes:
-        - name: model-storage
-          emptyDir: {}
         - name: tmp
           emptyDir: {}
       affinity:

@@ -140,6 +140,12 @@ variable "acr_id" {
   default     = null
 }
 
+variable "enable_acr_integration" {
+  description = "Enable ACR integration (set to true when acr_id is provided)"
+  type        = bool
+  default     = false
+}
+
 variable "tags" {
   description = "Resource tags"
   type        = map(string)

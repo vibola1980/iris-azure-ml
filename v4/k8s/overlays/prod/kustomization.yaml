@@ -1,3 +1,19 @@
+# ============================================
+# Iris ML API v4 - Kubernetes Production Overlay
+# ============================================
+#
+# IMPORTANTE: Após provisionar a infraestrutura com Terraform,
+# atualize os valores abaixo com os nomes dos recursos gerados:
+#   - ACR: Execute `terraform output acr_login_server` para obter o nome
+#   - Storage Account: Execute `terraform output storage_account_name`
+#   - Key Vault URL: Execute `terraform output keyvault_uri`
+#
+# Exemplo: Se o sufixo gerado for "abc123", os valores seriam:
+#   - ACR: acririsprodabc123.azurecr.io
+#   - Storage: stirisprodabc123
+#   - Key Vault: https://kv-iris-prod-abc123.vault.azure.net/
+# ============================================
+
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
@@ -11,13 +27,14 @@ commonLabels:
   environment: prod
 
 # Image configuration for prod
+# NOTA: Atualize 'newName' com o nome do ACR após terraform apply
 images:
   - name: api-gateway
-    newName: acririsprod.azurecr.io/iris/api-gateway
-    # newTag is set dynamically during deployment
+    newName: acririsprod.azurecr.io/iris/api-gateway  # TODO: Atualizar com sufixo
+    newTag: latest
   - name: inference-service
-    newName: acririsprod.azurecr.io/iris/inference-service
-    # newTag is set dynamically during deployment
+    newName: acririsprod.azurecr.io/iris/inference-service  # TODO: Atualizar com sufixo
+    newTag: latest
 
 # Patches for prod environment
 patches:
@@ -107,9 +124,15 @@ patches:
         value: 2
 
 # ConfigMap patches for prod
-configMapGenerator:
-  - name: model-config
-    behavior: merge
-    literals:
-      - STORAGE_ACCOUNT=stirisprod
-      - MODEL_VERSION=1.0.0
+# NOTA: Atualize STORAGE_ACCOUNT com o nome correto após terraform apply
+patches:
+  - target:
+      kind: ConfigMap
+      name: model-config
+    patch: |
+      - op: replace
+        path: /data/STORAGE_ACCOUNT
+        value: "stirisprod"
+      - op: replace
+        path: /data/MODEL_VERSION
+        value: "1.0.0"

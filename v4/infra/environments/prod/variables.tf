@@ -17,6 +17,7 @@ variable "api_key" {
 variable "alert_email_addresses" {
   description = "Email addresses for alerts"
   type        = list(string)
+  default     = []
 }
 
 variable "enable_private_endpoints" {

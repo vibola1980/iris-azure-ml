@@ -2,6 +2,14 @@
 # Azure Networking Module
 # VNet, Subnets, NSGs for AKS
 # ============================================
+#
+# NOTA: O Azure cria automaticamente um Resource Group chamado
+# "NetworkWatcherRG" quando você provisiona recursos de rede (VNet, NSG).
+# Este RG contém o Network Watcher para monitoramento e diagnóstico de rede.
+# Ele NÃO é gerenciado pelo Terraform e deve ser excluído manualmente
+# ou via Azure CLI (az group delete --name NetworkWatcherRG) após
+# destruir a infraestrutura principal.
+# ============================================
 
 resource "azurerm_virtual_network" "main" {
   name                = "vnet-${var.project_name}-${var.environment}"
@@ -33,7 +41,7 @@ resource "azurerm_subnet" "private_endpoints" {
   virtual_network_name = azurerm_virtual_network.main.name
   address_prefixes     = var.private_endpoints_subnet_address_prefix
 
-  private_endpoint_network_policies_enabled = true
+  private_endpoint_network_policies = "Enabled"
 }
 
 # AKS Network Security Group

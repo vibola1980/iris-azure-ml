@@ -6,7 +6,7 @@
 data "azurerm_client_config" "current" {}
 
 resource "azurerm_key_vault" "main" {
-  name                = "kv-${var.project_name}-${var.environment}"
+  name                = "kv-${var.project_name}-${var.environment}-${var.name_suffix}"
   location            = var.location
   resource_group_name = var.resource_group_name
   tenant_id           = data.azurerm_client_config.current.tenant_id
@@ -79,10 +79,10 @@ resource "azurerm_key_vault_access_policy" "aks" {
 
 # Store secrets
 resource "azurerm_key_vault_secret" "secrets" {
-  for_each = var.secrets
+  for_each = nonsensitive(toset(keys(var.secrets)))
 
   name         = each.key
-  value        = each.value
+  value        = var.secrets[each.key]
   key_vault_id = azurerm_key_vault.main.id
 
   depends_on = [

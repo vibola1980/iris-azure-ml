@@ -1,3 +1,17 @@
+# ============================================
+# Iris ML API v4 - Kubernetes Dev Overlay
+# ============================================
+#
+# IMPORTANTE: Após provisionar a infraestrutura com Terraform,
+# atualize os valores abaixo com os nomes dos recursos gerados:
+#   - ACR: Execute `terraform output acr_login_server` para obter o nome
+#   - Storage Account: Execute `terraform output storage_account_name`
+#
+# Exemplo: Se o sufixo gerado for "abc123", os valores seriam:
+#   - ACR: acririsdevabc123.azurecr.io (nota: ACR não usa hífen no nome)
+#   - Storage: stirisdevabc123
+# ============================================
+
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
@@ -11,12 +25,13 @@ commonLabels:
   environment: dev
 
 # Image configuration for dev
+# NOTA: Atualize 'newName' com o nome do ACR após terraform apply
 images:
   - name: api-gateway
-    newName: acririsdev.azurecr.io/iris/api-gateway
+    newName: acririsdev.azurecr.io/iris/api-gateway  # TODO: Atualizar com sufixo
     newTag: latest
   - name: inference-service
-    newName: acririsdev.azurecr.io/iris/inference-service
+    newName: acririsdev.azurecr.io/iris/inference-service  # TODO: Atualizar com sufixo
     newTag: latest
 
 # Patches for dev environment
@@ -66,11 +81,15 @@ patches:
       - op: replace
         path: /spec/minAvailable
         value: 1
-
-# ConfigMap patches for dev
-configMapGenerator:
-  - name: model-config
-    behavior: merge
-    literals:
-      - STORAGE_ACCOUNT=stirisdev
-      - MODEL_VERSION=1.0.0-dev
+  # ConfigMap patches for dev
+  # NOTA: Atualize STORAGE_ACCOUNT com o nome correto após terraform apply
+  - target:
+      kind: ConfigMap
+      name: model-config
+    patch: |
+      - op: replace
+        path: /data/STORAGE_ACCOUNT
+        value: "stirisdev"
+      - op: replace
+        path: /data/MODEL_VERSION
+        value: "1.0.0-dev"

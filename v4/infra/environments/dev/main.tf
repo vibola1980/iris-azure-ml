@@ -11,6 +11,10 @@ terraform {
       source  = "hashicorp/azurerm"
       version = "~> 3.85"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.5"
+    }
   }
 
   # Backend configuration (uncomment for remote state)
@@ -30,11 +34,19 @@ provider "azurerm" {
   }
 }
 
+# Random suffix for globally unique names
+resource "random_string" "suffix" {
+  length  = 6
+  special = false
+  upper   = false
+}
+
 # Local variables
 locals {
-  project_name = "iris"
-  environment  = "dev"
-  location     = var.location
+  project_name    = "iris"
+  environment     = "dev"
+  location        = var.location
+  unique_suffix   = random_string.suffix.result
 
   tags = {
     Project     = "iris-ml-v4"
@@ -75,7 +87,7 @@ module "monitoring" {
   location            = local.location
   resource_group_name = azurerm_resource_group.main.name
 
-  log_retention_days    = 30
+  log_retention_days    = 30             # Minimo permitido pela Azure
   alert_email_addresses = var.alert_email_addresses
   enable_alerts         = false # Disable alerts in dev
 
@@ -105,6 +117,7 @@ module "storage" {
   environment         = local.environment
   location            = local.location
   resource_group_name = azurerm_resource_group.main.name
+  name_suffix         = local.unique_suffix
 
   account_tier       = "Standard"
   replication_type   = "LRS"
@@ -112,6 +125,9 @@ module "storage" {
 
   tags = local.tags
 }
+
+# Current user/service principal for Terraform
+data "azurerm_client_config" "current" {}
 
 # Key Vault
 module "keyvault" {
@@ -121,6 +137,7 @@ module "keyvault" {
   environment         = local.environment
   location            = local.location
   resource_group_name = azurerm_resource_group.main.name
+  name_suffix         = local.unique_suffix
 
   enable_rbac_authorization  = true
   purge_protection_enabled   = false # Allow purge in dev
@@ -134,6 +151,13 @@ module "keyvault" {
   tags = local.tags
 }
 
+# Grant Terraform user access to Key Vault secrets
+resource "azurerm_role_assignment" "terraform_keyvault_secrets" {
+  scope                = module.keyvault.id
+  role_definition_name = "Key Vault Secrets Officer"
+  principal_id         = data.azurerm_client_config.current.object_id
+}
+
 # AKS Cluster
 module "aks" {
   source = "../../modules/aks"
@@ -143,18 +167,19 @@ module "aks" {
   location            = local.location
   resource_group_name = azurerm_resource_group.main.name
 
-  kubernetes_version  = "1.28"
-  system_node_vm_size = "Standard_D2s_v3"
-  system_node_count   = 2
+  kubernetes_version  = "1.32"
+  system_node_vm_size = "Standard_D2s_v3"  # VM classica suportada pelo AKS
+  system_node_count   = 1                 # Mínimo para testes
   enable_autoscaling  = true
-  system_node_min_count = 2
-  system_node_max_count = 3
+  system_node_min_count = 1               # Escala a partir de 1 node
+  system_node_max_count = 2               # Máximo reduzido para controle de custos
 
   enable_ml_node_pool = false # Not needed for dev
 
   subnet_id                  = module.networking.aks_subnet_id
   log_analytics_workspace_id = module.monitoring.log_analytics_workspace_id
   acr_id                     = module.acr.id
+  enable_acr_integration     = true
 
   tags = local.tags
 }

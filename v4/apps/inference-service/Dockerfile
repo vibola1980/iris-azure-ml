@@ -37,8 +37,9 @@ ENV PATH=/home/appuser/.local/bin:$PATH
 # Copy application source
 COPY --chown=appuser:appgroup src/ .
 
-# Create models directory (will be mounted or filled by init container)
+# Create models directory and copy model (for dev/testing)
 RUN mkdir -p /app/models && chown -R appuser:appgroup /app
+COPY --chown=appuser:appgroup models/model.pkl /app/models/model.pkl
 
 # Switch to non-root user
 USER appuser

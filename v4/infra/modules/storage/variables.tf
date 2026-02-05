@@ -93,3 +93,9 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "name_suffix" {
+  description = "Suffix for unique naming"
+  type        = string
+  default     = ""
+}
