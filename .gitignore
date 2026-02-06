@@ -1,0 +1,32 @@
+﻿# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+
+# Artifacts
+**/training/artifacts/
+**/artifacts/
+*.pkl
+
+# Terraform
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.*
+**/.terraform.lock.hcl
+**/tfplan
+**/tfplan.*
+
+# Claude Code
+.claude/
+
+# Java/Maven
+**/target/
+*.jar
+*.class
+
+# IDE
+.idea/
+*.iml
+.vscode/

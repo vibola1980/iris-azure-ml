@@ -1,0 +1,45 @@
+spring:
+  application:
+    name: iris-classifier-api
+  jmx:
+    enabled: false
+
+# Server configuration
+server:
+  port: 8080
+  error:
+    include-message: always
+    include-binding-errors: always
+
+# Actuator (health checks + metrics)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# Application properties
+iris:
+  model:
+    version: 1.0.0
+    path: models/model.pkl
+  inference:
+    service:
+      url: http://inference-service:5000
+  api:
+    key: ${API_KEY:}
+
+# Logging
+logging:
+  level:
+    root: WARN
+    com.iris: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %logger{36} - %level - %msg%n"

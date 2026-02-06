@@ -1,0 +1,74 @@
+services:
+  # Inference service (Python + FastAPI)
+  inference-service:
+    build:
+      context: ./inference-service
+      dockerfile: Dockerfile
+    container_name: iris-inference-service
+    ports:
+      - "5000:5000"
+    environment:
+      - MODEL_PATH=../models/model.pkl
+      - MODEL_VERSION=1.0.0
+      - API_KEY=test123
+      - LOG_LEVEL=INFO
+    volumes:
+      # Mount models directory from host
+      - ./models:/app/../models:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - iris-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # API Service (Java/Spring Boot)
+  api-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: iris-api-service
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - IRIS_INFERENCE_SERVICE_URL=http://inference-service:5000
+      - IRIS_MODEL_VERSION=1.0.0
+      - IRIS_API_KEY=test123
+      - API_KEY=test123
+      - JAVA_OPTS=-Xms256m -Xmx512m -XX:+UseG1GC
+    depends_on:
+      - inference-service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - iris-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  iris-net:
+    driver: bridge
+
+# Usage:
+# docker-compose up -d                    # Start both services
+# docker-compose ps                       # Check status
+# docker-compose logs -f api-service      # View API logs
+# docker-compose logs -f inference-service # View inference logs
+# docker-compose down                     # Stop both services
