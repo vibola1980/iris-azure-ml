@@ -1,6 +1,7 @@
 # ============================================
 # ArgoCD Application - Iris ML DEV
 # Sincroniza automaticamente com o GitHub
+# Image Updater habilitado para auto-update
 # ============================================
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -10,6 +11,31 @@ metadata:
   labels:
     app.kubernetes.io/name: iris-ml
     environment: dev
+  # ==========================================
+  # ARGOCD IMAGE UPDATER ANNOTATIONS
+  # ==========================================
+  annotations:
+    # Lista de imagens para monitorar (separadas por virgula)
+    argocd-image-updater.argoproj.io/image-list: |
+      api-gateway=acririsdev.azurecr.io/iris/api-gateway,
+      inference-service=acririsdev.azurecr.io/iris/inference-service
+
+    # Estrategia de update: semver, latest, digest
+    argocd-image-updater.argoproj.io/api-gateway.update-strategy: semver
+    argocd-image-updater.argoproj.io/inference-service.update-strategy: semver
+
+    # Filtro de versao (aceita apenas tags semver)
+    argocd-image-updater.argoproj.io/api-gateway.allow-tags: regexp:^[0-9]+\.[0-9]+\.[0-9]+$
+    argocd-image-updater.argoproj.io/inference-service.allow-tags: regexp:^[0-9]+\.[0-9]+\.[0-9]+$
+
+    # Metodo write-back: onde salvar a nova tag
+    # git = commit no repositorio (recomendado)
+    argocd-image-updater.argoproj.io/write-back-method: git:secret:argocd/git-credentials
+    argocd-image-updater.argoproj.io/write-back-target: kustomization
+
+    # Branch para commits
+    argocd-image-updater.argoproj.io/git-branch: master
+
   # Finalizer para limpeza dos recursos quando app for deletada
   finalizers:
     - resources-finalizer.argocd.argoproj.io

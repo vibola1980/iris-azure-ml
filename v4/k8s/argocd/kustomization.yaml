@@ -1,6 +1,6 @@
 # ============================================
 # ArgoCD Kustomization
-# Instala ArgoCD usando manifests oficiais
+# Instala ArgoCD + Image Updater
 # ============================================
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
@@ -15,8 +15,14 @@ resources:
   # Fonte: https://github.com/argoproj/argo-cd/releases
   - https://raw.githubusercontent.com/argoproj/argo-cd/v2.9.3/manifests/install.yaml
 
+  # Instalacao do Image Updater
+  # Fonte: https://github.com/argoproj-labs/argocd-image-updater/releases
+  - https://raw.githubusercontent.com/argoproj-labs/argocd-image-updater/v0.12.2/manifests/install.yaml
+
   # Configuracoes customizadas
   - argocd-cm.yaml
+  - image-updater/configmap.yaml
+  # - image-updater/secret-acr.yaml  # Criar manualmente com valores reais
 
   # Projeto e aplicacoes
   - projects/iris-project.yaml
