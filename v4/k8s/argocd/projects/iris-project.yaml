@@ -53,8 +53,12 @@ spec:
       kind: ReplicaSet
     - group: networking.k8s.io
       kind: Ingress
+    - group: networking.k8s.io
+      kind: NetworkPolicy
     - group: autoscaling
       kind: HorizontalPodAutoscaler
+    - group: policy
+      kind: PodDisruptionBudget
 
   # Roles do projeto (opcional)
   roles:

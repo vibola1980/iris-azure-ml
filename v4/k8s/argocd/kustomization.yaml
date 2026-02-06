@@ -19,19 +19,13 @@ resources:
   # Fonte: https://github.com/argoproj-labs/argocd-image-updater/releases
   - https://raw.githubusercontent.com/argoproj-labs/argocd-image-updater/v0.12.2/manifests/install.yaml
 
-  # Configuracoes customizadas
-  - argocd-cm.yaml
-  - image-updater/configmap.yaml
-  # - image-updater/secret-acr.yaml  # Criar manualmente com valores reais
-
-  # Projeto e aplicacoes
+  # Projeto e aplicacoes (nao tem conflito)
   - projects/iris-project.yaml
   - applications/iris-dev.yaml
   # - applications/iris-prod.yaml  # Descomentar quando prod estiver pronto
 
 patches:
   # Patch para expor ArgoCD via LoadBalancer (dev only)
-  # Em prod, usar Ingress com TLS
   - patch: |-
       - op: replace
         path: /spec/type
