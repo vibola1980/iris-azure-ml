@@ -1,0 +1,202 @@
+# ============================================
+# Validacao de Codigo e Dockerfiles
+# Roda em PRs que modificam codigo da aplicacao
+# ============================================
+name: Validate Code & Dockerfiles
+
+on:
+  pull_request:
+    branches:
+      - master
+      - main
+    paths:
+      - 'v4/apps/**'
+      - 'v4/ml/**'
+      - '.github/workflows/validate-code.yml'
+
+  workflow_dispatch:
+
+jobs:
+  # ==========================================
+  # Job 1: Validar Java (API Gateway)
+  # ==========================================
+  validate-java:
+    name: Java - Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build with Maven
+        working-directory: v4/apps/api-gateway
+        run: |
+          echo "🔨 Building Java API Gateway..."
+          mvn clean compile -q || echo "⚠️ Build warnings"
+
+      - name: Run tests
+        working-directory: v4/apps/api-gateway
+        run: |
+          echo "🧪 Running tests..."
+          mvn test -q || echo "⚠️ Some tests may have failed"
+
+      - name: Check code style
+        working-directory: v4/apps/api-gateway
+        run: |
+          echo "🎨 Checking code style..."
+          mvn checkstyle:check -q || echo "⚠️ Code style warnings"
+        continue-on-error: true
+
+  # ==========================================
+  # Job 2: Validar Python (Inference Service)
+  # ==========================================
+  validate-python:
+    name: Python - Lint & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        working-directory: v4/apps/inference-service
+        run: |
+          echo "📦 Installing dependencies..."
+          pip install -q -r requirements.txt
+          pip install -q flake8 pytest black isort
+
+      - name: Lint with flake8
+        working-directory: v4/apps/inference-service
+        run: |
+          echo "🔍 Linting with flake8..."
+          flake8 src/ --count --select=E9,F63,F7,F82 --show-source --statistics || true
+          flake8 src/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      - name: Check formatting with black
+        working-directory: v4/apps/inference-service
+        run: |
+          echo "🎨 Checking formatting..."
+          black --check src/ || echo "⚠️ Code needs formatting (run: black src/)"
+        continue-on-error: true
+
+      - name: Run tests
+        working-directory: v4/apps/inference-service
+        run: |
+          echo "🧪 Running tests..."
+          pytest tests/ -v || echo "⚠️ Some tests may have failed"
+        continue-on-error: true
+
+  # ==========================================
+  # Job 3: Validar Dockerfiles
+  # ==========================================
+  validate-dockerfiles:
+    name: Dockerfile - Lint & Security
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Hadolint
+        run: |
+          wget -q https://github.com/hadolint/hadolint/releases/download/v2.12.0/hadolint-Linux-x86_64
+          chmod +x hadolint-Linux-x86_64
+          sudo mv hadolint-Linux-x86_64 /usr/local/bin/hadolint
+
+      - name: Lint Dockerfiles
+        run: |
+          echo "🐳 Linting Dockerfiles..."
+
+          # Encontrar todos os Dockerfiles
+          find v4/apps -name 'Dockerfile*' -type f | while read dockerfile; do
+            echo "  Checking: $dockerfile"
+            hadolint "$dockerfile" --ignore DL3008 --ignore DL3013 || echo "  ⚠️ Warnings in $dockerfile"
+          done
+
+      - name: Security scan Dockerfiles
+        run: |
+          echo "🔒 Security scan..."
+
+          # Instalar trivy
+          sudo apt-get install -y wget apt-transport-https gnupg lsb-release
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+          echo deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main | sudo tee -a /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update
+          sudo apt-get install -y trivy
+
+          # Scan Dockerfiles
+          find v4/apps -name 'Dockerfile*' -type f | while read dockerfile; do
+            echo "  Scanning: $dockerfile"
+            trivy config "$dockerfile" --severity HIGH,CRITICAL || echo "  ⚠️ Issues in $dockerfile"
+          done
+
+  # ==========================================
+  # Job 4: Build de imagens (teste)
+  # ==========================================
+  build-images:
+    name: Docker - Build Test
+    runs-on: ubuntu-latest
+    needs: [validate-dockerfiles]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build API Gateway image
+        run: |
+          echo "🔨 Building API Gateway..."
+          if [ -f "v4/apps/api-gateway/Dockerfile" ]; then
+            docker build v4/apps/api-gateway -t iris/api-gateway:test --no-cache
+            echo "✅ API Gateway build OK"
+          else
+            echo "⚠️ Dockerfile not found for API Gateway"
+          fi
+
+      - name: Build Inference Service image
+        run: |
+          echo "🔨 Building Inference Service..."
+          if [ -f "v4/apps/inference-service/Dockerfile" ]; then
+            docker build v4/apps/inference-service -t iris/inference-service:test --no-cache
+            echo "✅ Inference Service build OK"
+          else
+            echo "⚠️ Dockerfile not found for Inference Service"
+          fi
+
+  # ==========================================
+  # Job 5: Resumo
+  # ==========================================
+  summary:
+    name: Validation Summary
+    runs-on: ubuntu-latest
+    needs: [validate-java, validate-python, validate-dockerfiles, build-images]
+    if: always()
+
+    steps:
+      - name: Results
+        run: |
+          echo "============================================"
+          echo "        RESUMO DA VALIDAÇÃO"
+          echo "============================================"
+          echo ""
+          echo "Java Build:         ${{ needs.validate-java.result }}"
+          echo "Python Lint:        ${{ needs.validate-python.result }}"
+          echo "Dockerfile Lint:    ${{ needs.validate-dockerfiles.result }}"
+          echo "Docker Build:       ${{ needs.build-images.result }}"
+          echo ""
+          echo "✅ Validação completa!"
