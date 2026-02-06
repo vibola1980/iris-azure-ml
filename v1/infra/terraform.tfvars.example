@@ -1,0 +1,8 @@
+﻿prefix          = "irisexp123"
+location        = "eastus"
+container_image = "docker.io/SEU_USER/iris-api:1.0.0"
+api_key         = "troque-esta-chave"
+tags = @{
+  project = "iris-ml"
+  owner   = "seu-nome"
+}

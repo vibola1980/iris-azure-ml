@@ -1,0 +1,136 @@
+version: '3.8'
+
+services:
+  # =========================================================================
+  # Iris Classifier API
+  # =========================================================================
+  iris-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: iris-api-dev
+    ports:
+      - "8000:8000"
+    
+    # Environment variables (from .env file or inline)
+    environment:
+      - MODEL_PATH=/models/model.pkl
+      - MODEL_VERSION=1.0.0
+      - API_KEY=${API_KEY:-test-key-123}
+      - MODEL_REGISTRY_TYPE=local
+      - LOCAL_MODELS_PATH=/models
+      - LOG_LEVEL=INFO
+    
+    # Volume mounts
+    volumes:
+      # Mount models directory for persistent model storage
+      - ./models:/models
+      # Optional: mount source code for development (auto-reload)
+      - ./api:/app/api:ro
+    
+    # Health checks for Docker
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    
+    # Restart policy
+    restart: unless-stopped
+    
+    # Network
+    networks:
+      - iris-network
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    depends_on:
+      - model-loader
+
+  # =========================================================================
+  # Model Loader Service (Init Container equivalent)
+  # =========================================================================
+  model-loader:
+    image: busybox:latest
+    container_name: iris-model-loader
+    
+    # Simple script to verify models exist
+    command: |
+      sh -c "
+        echo '🔍 Checking models...'
+        if [ ! -f /models/model.pkl ]; then
+          echo '⚠️  WARNING: model.pkl not found'
+          echo 'Create a symlink or copy model file to ./models/model.pkl'
+          echo ''
+          echo 'From project root:'
+          echo '  cp training/artifacts/model.pkl v2/iris-azure-ml/models/model-1.0.0.pkl'
+          echo '  ln -s models/model-1.0.0.pkl models/model.pkl'
+        else
+          echo '✅ Model found: $(ls -lh /models/model.pkl)'
+        fi
+        sleep infinity
+      "
+    
+    volumes:
+      - ./models:/models
+    
+    networks:
+      - iris-network
+    
+    restart: unless-stopped
+
+  # =========================================================================
+  # Optional: PostgreSQL for future metrics/monitoring
+  # =========================================================================
+  # postgres:
+  #   image: postgres:15-alpine
+  #   container_name: iris-postgres
+  #   environment:
+  #     POSTGRES_DB: iris_metrics
+  #     POSTGRES_USER: iris_user
+  #     POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   networks:
+  #     - iris-network
+  #   ports:
+  #     - "5432:5432"
+
+  # =========================================================================
+  # Optional: MLflow Server (for model registry)
+  # =========================================================================
+  # mlflow:
+  #   image: ghcr.io/mlflow/mlflow:latest
+  #   container_name: iris-mlflow
+  #   command: mlflow server --host 0.0.0.0 --port 5000
+  #   environment:
+  #     BACKEND_STORE_URI: postgresql://iris_user:${DB_PASSWORD:-changeme}@postgres:5432/iris_metrics
+  #     DEFAULT_ARTIFACT_ROOT: /mlflow/artifacts
+  #   volumes:
+  #     - mlflow_artifacts:/mlflow/artifacts
+  #   networks:
+  #     - iris-network
+  #   ports:
+  #     - "5000:5000"
+  #   depends_on:
+  #     - postgres
+
+# ============================================================================
+# Networks
+# ============================================================================
+networks:
+  iris-network:
+    driver: bridge
+
+# ============================================================================
+# Volumes
+# ============================================================================
+volumes:
+  # postgres_data:
+  # mlflow_artifacts:
