@@ -28,11 +28,11 @@ commonLabels:
 # NOTA: Atualize 'newName' com o nome do ACR após terraform apply
 images:
   - name: api-gateway
-    newName: acririsdev.azurecr.io/iris/api-gateway  # TODO: Atualizar com sufixo
-    newTag: latest
+    newName: acririsdev.azurecr.io/iris/api-gateway
+    newTag: "1.0.0"
   - name: inference-service
-    newName: acririsdev.azurecr.io/iris/inference-service  # TODO: Atualizar com sufixo
-    newTag: latest
+    newName: acririsdev.azurecr.io/iris/inference-service
+    newTag: "1.0.0"
 
 # Patches for dev environment
 patches:
@@ -89,7 +89,7 @@ patches:
     patch: |
       - op: replace
         path: /data/STORAGE_ACCOUNT
-        value: "stirisdev"
+        value: "stirisdevxjrpx1"
       - op: replace
         path: /data/MODEL_VERSION
         value: "1.0.0-dev"
