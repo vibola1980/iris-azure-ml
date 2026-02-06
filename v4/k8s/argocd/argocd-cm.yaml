@@ -1,0 +1,74 @@
+# ============================================
+# ArgoCD ConfigMap - Configuracoes Customizadas
+# ============================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-cm
+    app.kubernetes.io/part-of: argocd
+data:
+  # URL do repositorio (atualizar se necessario)
+  url: https://argocd.iris-dev.example.com
+
+  # Permitir aplicacoes fora do namespace argocd
+  application.instanceLabelKey: argocd.argoproj.io/instance
+
+  # Configuracao de repositorios
+  # Repositorios publicos nao precisam de credenciais
+  repositories: |
+    - url: https://github.com/vibola1980/iris-azure-ml.git
+      name: iris-azure-ml
+
+  # Timeout para sync (segundos)
+  timeout.reconciliation: "180s"
+
+  # Health checks customizados
+  resource.customizations.health.argoproj.io_Application: |
+    hs = {}
+    hs.status = "Progressing"
+    hs.message = ""
+    if obj.status ~= nil then
+      if obj.status.health ~= nil then
+        hs.status = obj.status.health.status
+        if obj.status.health.message ~= nil then
+          hs.message = obj.status.health.message
+        end
+      end
+    end
+    return hs
+
+---
+# ============================================
+# ArgoCD RBAC ConfigMap
+# ============================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-rbac-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-rbac-cm
+    app.kubernetes.io/part-of: argocd
+data:
+  # Politica padrao: somente leitura
+  policy.default: role:readonly
+
+  # Politicas customizadas
+  policy.csv: |
+    # Admins podem tudo
+    p, role:admin, applications, *, */*, allow
+    p, role:admin, clusters, *, *, allow
+    p, role:admin, repositories, *, *, allow
+    p, role:admin, projects, *, *, allow
+
+    # Desenvolvedores podem sync e ver logs
+    p, role:developer, applications, get, */*, allow
+    p, role:developer, applications, sync, */*, allow
+    p, role:developer, applications, action/*, */*, allow
+    p, role:developer, logs, get, */*, allow
+
+    # Grupo admin do GitHub (ajustar conforme necessario)
+    g, vibola1980, role:admin

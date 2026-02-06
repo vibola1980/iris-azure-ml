@@ -1,0 +1,82 @@
+# ============================================
+# ArgoCD AppProject - Iris ML
+# Define permissoes e limites para o projeto
+# ============================================
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: iris-ml
+  namespace: argocd
+  # Finalizer para limpeza segura
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: "Iris ML Classification API - Projeto GitOps"
+
+  # Repositorios permitidos
+  sourceRepos:
+    - https://github.com/vibola1980/iris-azure-ml.git
+
+  # Destinos permitidos (clusters e namespaces)
+  destinations:
+    # DEV
+    - namespace: iris-ml
+      server: https://kubernetes.default.svc
+    - namespace: iris-ml-dev
+      server: https://kubernetes.default.svc
+    # PROD
+    - namespace: iris-ml-prod
+      server: https://kubernetes.default.svc
+
+  # Recursos que podem ser criados
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+
+  # Recursos de namespace permitidos
+  namespaceResourceWhitelist:
+    - group: ''
+      kind: ConfigMap
+    - group: ''
+      kind: Secret
+    - group: ''
+      kind: Service
+    - group: ''
+      kind: ServiceAccount
+    - group: ''
+      kind: PersistentVolumeClaim
+    - group: apps
+      kind: Deployment
+    - group: apps
+      kind: StatefulSet
+    - group: apps
+      kind: ReplicaSet
+    - group: networking.k8s.io
+      kind: Ingress
+    - group: autoscaling
+      kind: HorizontalPodAutoscaler
+
+  # Roles do projeto (opcional)
+  roles:
+    - name: developer
+      description: "Permissao para desenvolvedores"
+      policies:
+        - p, proj:iris-ml:developer, applications, get, iris-ml/*, allow
+        - p, proj:iris-ml:developer, applications, sync, iris-ml/*, allow
+      groups:
+        - iris-developers
+
+    - name: admin
+      description: "Permissao total no projeto"
+      policies:
+        - p, proj:iris-ml:admin, applications, *, iris-ml/*, allow
+      groups:
+        - iris-admins
+
+  # Janelas de sync (opcional - para controlar quando deploy pode acontecer)
+  # syncWindows:
+  #   - kind: allow
+  #     schedule: "0 8-18 * * 1-5"  # Seg-Sex, 8h-18h
+  #     duration: 10h
+  #     applications:
+  #       - "*-prod"

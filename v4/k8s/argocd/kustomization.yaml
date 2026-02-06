@@ -1,0 +1,35 @@
+# ============================================
+# ArgoCD Kustomization
+# Instala ArgoCD usando manifests oficiais
+# ============================================
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: argocd
+
+resources:
+  # Namespace primeiro
+  - namespace.yaml
+
+  # Instalacao oficial do ArgoCD (versao estavel)
+  # Fonte: https://github.com/argoproj/argo-cd/releases
+  - https://raw.githubusercontent.com/argoproj/argo-cd/v2.9.3/manifests/install.yaml
+
+  # Configuracoes customizadas
+  - argocd-cm.yaml
+
+  # Projeto e aplicacoes
+  - projects/iris-project.yaml
+  - applications/iris-dev.yaml
+  # - applications/iris-prod.yaml  # Descomentar quando prod estiver pronto
+
+patches:
+  # Patch para expor ArgoCD via LoadBalancer (dev only)
+  # Em prod, usar Ingress com TLS
+  - patch: |-
+      - op: replace
+        path: /spec/type
+        value: LoadBalancer
+    target:
+      kind: Service
+      name: argocd-server
