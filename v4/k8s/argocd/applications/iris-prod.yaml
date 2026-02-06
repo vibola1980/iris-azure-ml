@@ -1,0 +1,59 @@
+# ============================================
+# ArgoCD Application - Iris ML PROD
+# Sync MANUAL para maior controle
+# ============================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: iris-ml-prod
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: iris-ml
+    environment: prod
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: iris-ml
+
+  source:
+    repoURL: https://github.com/vibola1980/iris-azure-ml.git
+    # PROD usa tag especifica ou branch de release
+    targetRevision: master  # Mudar para tags em producao real (ex: v1.0.0)
+    path: v4/k8s/overlays/prod
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: iris-ml-prod
+
+  syncPolicy:
+    # PRODUCAO: Sync MANUAL (sem automated)
+    # Requer aprovacao explicita para deploy
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m
+
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
+    - group: ""
+      kind: Service
+      jsonPointers:
+        - /spec/clusterIP
+
+  info:
+    - name: "Documentacao"
+      value: "https://github.com/vibola1980/iris-azure-ml/tree/master/v4/docs"
+    - name: "Ambiente"
+      value: "Producao"
+    - name: "Sync"
+      value: "Manual - Requer aprovacao"

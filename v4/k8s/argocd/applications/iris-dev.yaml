@@ -1,0 +1,72 @@
+# ============================================
+# ArgoCD Application - Iris ML DEV
+# Sincroniza automaticamente com o GitHub
+# ============================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: iris-ml-dev
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: iris-ml
+    environment: dev
+  # Finalizer para limpeza dos recursos quando app for deletada
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  # Projeto (define permissoes)
+  project: iris-ml
+
+  # Fonte: repositorio Git
+  source:
+    repoURL: https://github.com/vibola1980/iris-azure-ml.git
+    targetRevision: master  # ou HEAD para sempre pegar o mais recente
+    path: v4/k8s/overlays/dev
+
+  # Destino: cluster Kubernetes
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: iris-ml
+
+  # Politica de sync
+  syncPolicy:
+    # Sync automatico quando Git mudar
+    automated:
+      # Criar namespace se nao existir
+      prune: true
+      # Deletar recursos que nao estao no Git
+      selfHeal: true
+      # Permitir namespaces vazios
+      allowEmpty: false
+
+    # Opcoes de sync
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+
+    # Retry em caso de falha
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  # Ignorar diferencas em campos que mudam dinamicamente
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
+    - group: ""
+      kind: Service
+      jsonPointers:
+        - /spec/clusterIP
+
+  # Informacoes adicionais (aparecem na UI)
+  info:
+    - name: "Documentacao"
+      value: "https://github.com/vibola1980/iris-azure-ml/tree/master/v4/docs"
+    - name: "Ambiente"
+      value: "Desenvolvimento"
