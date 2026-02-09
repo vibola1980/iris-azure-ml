@@ -502,6 +502,86 @@ resource "azurerm_container_group" "aci" {
 }
 ```
 
+### variables.tf (as variaveis de entrada)
+
+Sem este arquivo o Terraform nao sabe o que significam `var.prefix`, `var.api_key` e cia. E tipo tentar fazer um bolo sem lista de ingredientes.
+
+```hcl
+variable "prefix" {
+  type        = string
+  description = "Short unique prefix for resource naming (e.g., irisml01)."
+}
+
+variable "location" {
+  type        = string
+  description = "Azure region (e.g., eastus)."
+  default     = "eastus"
+}
+
+variable "container_image" {
+  type        = string
+  description = "Docker image in ACR (e.g., iris-api:1.0.0, without the server URL)."
+}
+
+variable "api_key" {
+  type        = string
+  description = "API key to protect the prediction endpoint."
+  sensitive   = true
+}
+
+variable "tags" {
+  type    = map(string)
+  default = { project = "iris-ml" }
+}
+
+variable "subscription_id" {
+  type        = string
+  description = "Azure Subscription ID where resources will be created."
+}
+
+variable "deploy_aci" {
+  type        = bool
+  description = "Set to true to deploy the ACI container (requires image in ACR and model in File Share)."
+  default     = false
+}
+```
+
+> **Nota:** `sensitive = true` na `api_key` faz o Terraform esconder o valor nos logs. Seguranca ate nos detalhes.
+
+### outputs.tf (o que voce quer saber no final)
+
+```hcl
+output "resource_group_name" {
+  value = azurerm_resource_group.rg.name
+}
+
+output "key_vault_name" {
+  value = azurerm_key_vault.kv.name
+}
+
+output "storage_account_name" {
+  value = azurerm_storage_account.sa.name
+}
+
+output "acr_login_server" {
+  value = azurerm_container_registry.acr.login_server
+}
+
+output "acr_name" {
+  value = azurerm_container_registry.acr.name
+}
+
+output "aci_fqdn" {
+  value = var.deploy_aci ? azurerm_container_group.aci[0].fqdn : "(ACI not deployed yet)"
+}
+
+output "predict_url" {
+  value = var.deploy_aci ? "http://${azurerm_container_group.aci[0].fqdn}:8000/predict" : "(deploy with -var=deploy_aci=true after pushing image and model)"
+}
+```
+
+Note como os outputs do ACI usam condicional - se `deploy_aci` e `false`, em vez de dar erro ele mostra uma mensagem amigavel. Terraform elegante e Terraform feliz.
+
 ### Configurar e aplicar
 
 ```bash
@@ -562,13 +642,36 @@ docker push irisml01acr.azurecr.io/iris-api:1.0.0
 
 ### Upload do modelo pro File Share
 
+**Windows (PowerShell):**
+
 ```powershell
-# PowerShell
 .\scripts\upload_model_to_fileshare.ps1 `
   -KeyVaultName "irisml01-kv" `
   -StorageAccountName "irisml01sa" `
   -FileShareName "mlshare"
 ```
+
+**Linux / Mac (Bash):**
+
+```bash
+# Busca a chave do Storage Account no Key Vault
+SA_KEY=$(az keyvault secret show \
+  --vault-name "irisml01-kv" \
+  --name "storage-account-key" \
+  --query value -o tsv)
+
+# Faz upload do modelo pro File Share
+az storage file upload \
+  --account-name "irisml01sa" \
+  --account-key "$SA_KEY" \
+  --share-name "mlshare" \
+  --source "training/artifacts/model.pkl" \
+  --path "model.pkl"
+
+echo "Upload complete: model.pkl"
+```
+
+> **Dica pra quem usa Linux/Mac:** os comandos `az` sao identicos - a unica diferenca e trocar PowerShell por Bash. O Azure CLI e multiplataforma, entao funciona igual nos dois mundos.
 
 ### Agora sim: subir o ACI!
 
