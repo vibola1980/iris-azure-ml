@@ -17,6 +17,7 @@ venv/
 **/.terraform.lock.hcl
 **/tfplan
 **/tfplan.*
+**/terraform.tfvars
 
 # Claude Code
 .claude/
