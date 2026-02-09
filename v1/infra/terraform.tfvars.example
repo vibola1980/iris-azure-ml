@@ -1,8 +1,10 @@
-﻿prefix          = "irisexp123"
+prefix          = "irisml01"
 location        = "eastus"
-container_image = "docker.io/SEU_USER/iris-api:1.0.0"
-api_key         = "troque-esta-chave"
-tags = @{
+container_image = "iris-api:1.0.0"
+api_key         = "change-this-key"
+subscription_id = "your-azure-subscription-id"
+deploy_aci      = false  # Set to true after pushing image to ACR and model to File Share
+tags = {
   project = "iris-ml"
-  owner   = "seu-nome"
+  owner   = "your-name"
 }

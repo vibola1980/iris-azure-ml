@@ -1,4 +1,4 @@
-# ML / Treino
+# ML / Training
 scikit-learn==1.5.2
 joblib==1.4.2
 numpy==2.1.3
@@ -7,5 +7,5 @@ numpy==2.1.3
 fastapi==0.115.6
 uvicorn[standard]==0.32.1
 
-# Utilitários (opcional, mas ajuda no Windows/testes)
+# Utilities (optional, useful for testing)
 requests==2.32.3

@@ -23,9 +23,9 @@ output "acr_name" {
 }
 
 output "aci_fqdn" {
-  value = azurerm_container_group.aci.fqdn
+  value = var.deploy_aci ? azurerm_container_group.aci[0].fqdn : "(ACI not deployed yet)"
 }
 
 output "predict_url" {
-  value = "http://${azurerm_container_group.aci.fqdn}:8000/predict"
+  value = var.deploy_aci ? "http://${azurerm_container_group.aci[0].fqdn}:8000/predict" : "(deploy with -var=deploy_aci=true after pushing image and model)"
 }

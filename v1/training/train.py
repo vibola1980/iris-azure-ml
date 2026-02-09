@@ -1,4 +1,4 @@
-﻿import json
+import json
 import os
 import joblib
 import numpy as np
@@ -78,7 +78,7 @@ def main():
         "artifacts/model.pkl",
     )
 
-    # Tornar best_params serializável (pois pode conter o objeto do estimador em "clf")
+    # Make best_params serializable (the "clf" key may contain an estimator object)
     best_params = dict(search.best_params_)
     if "clf" in best_params:
         best_params["clf"] = best_params["clf"].__class__.__name__

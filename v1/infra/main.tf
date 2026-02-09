@@ -82,6 +82,7 @@ resource "azurerm_container_registry" "acr" {
 }
 
 resource "azurerm_container_group" "aci" {
+  count               = var.deploy_aci ? 1 : 0
   name                = "${var.prefix}-aci"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name

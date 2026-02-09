@@ -1,22 +1,22 @@
 variable "prefix" {
   type        = string
-  description = "Prefixo curto e Ãºnico (ex: irisexp123)."
+  description = "Short unique prefix for resource naming (e.g., irisexp123)."
 }
 
 variable "location" {
   type        = string
-  description = "RegiÃ£o Azure (ex: eastus)."
+  description = "Azure region (e.g., eastus)."
   default     = "eastus"
 }
 
 variable "container_image" {
   type        = string
-  description = "Imagem Docker no ACR (ex: iris-api:1.0.0, sem o servidor)."
+  description = "Docker image in ACR (e.g., iris-api:1.0.0, without the server URL)."
 }
 
 variable "api_key" {
   type        = string
-  description = "Chave simples para proteger o endpoint."
+  description = "API key to protect the prediction endpoint."
   sensitive   = true
 }
 
@@ -27,6 +27,11 @@ variable "tags" {
 
 variable "subscription_id" {
   type        = string
-  description = "Azure Subscription ID onde os recursos serão criados."
+  description = "Azure Subscription ID where resources will be created."
 }
 
+variable "deploy_aci" {
+  type        = bool
+  description = "Set to true to deploy the ACI container (requires image in ACR and model in File Share)."
+  default     = false
+}
