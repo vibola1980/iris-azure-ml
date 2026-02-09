@@ -10,7 +10,7 @@ services:
     environment:
       - MODEL_PATH=../models/model.pkl
       - MODEL_VERSION=1.0.0
-      - API_KEY=test123
+      - API_KEY=${API_KEY:-changeme}
       - LOG_LEVEL=INFO
     volumes:
       # Mount models directory from host
@@ -42,8 +42,8 @@ services:
       - SPRING_PROFILES_ACTIVE=docker
       - IRIS_INFERENCE_SERVICE_URL=http://inference-service:5000
       - IRIS_MODEL_VERSION=1.0.0
-      - IRIS_API_KEY=test123
-      - API_KEY=test123
+      - IRIS_API_KEY=${API_KEY:-changeme}
+      - API_KEY=${API_KEY:-changeme}
       - JAVA_OPTS=-Xms256m -Xmx512m -XX:+UseG1GC
     depends_on:
       - inference-service
