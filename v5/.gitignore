@@ -1,0 +1,104 @@
+# ============================================
+# Iris ML API v4 - Git Ignore
+# ============================================
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+
+# Java
+apps/api-gateway/target/
+*.class
+*.jar
+*.war
+*.ear
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+venv/
+ENV/
+.env
+.venv
+
+# Python testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# ML Models (should be in Azure Blob Storage)
+ml/models/*.pkl
+ml/models/*.joblib
+*.pkl
+*.h5
+*.onnx
+
+# Terraform
+infra/**/.terraform/
+infra/**/*.tfstate
+infra/**/*.tfstate.*
+infra/**/*.tfvars
+!infra/**/*.tfvars.example
+infra/**/.terraform.lock.hcl
+infra/**/crash.log
+infra/**/crash.*.log
+infra/**/override.tf
+infra/**/override.tf.json
+infra/**/*_override.tf
+infra/**/*_override.tf.json
+
+# Kubernetes
+k8s/overlays/*/secrets.yaml
+!k8s/overlays/dev/secrets.yaml
+
+# Docker
+.docker/
+
+# Logs
+logs/
+*.log
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Credentials (never commit!)
+credentials.json
+service-account.json
+*.pem
+*.key

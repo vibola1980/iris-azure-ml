@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: iris-ml
+  labels:
+    app.kubernetes.io/name: iris-ml
+    app.kubernetes.io/part-of: iris-ml-platform

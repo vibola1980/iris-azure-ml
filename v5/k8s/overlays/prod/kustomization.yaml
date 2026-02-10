@@ -1,0 +1,138 @@
+# ============================================
+# Iris ML API v4 - Kubernetes Production Overlay
+# ============================================
+#
+# IMPORTANTE: Após provisionar a infraestrutura com Terraform,
+# atualize os valores abaixo com os nomes dos recursos gerados:
+#   - ACR: Execute `terraform output acr_login_server` para obter o nome
+#   - Storage Account: Execute `terraform output storage_account_name`
+#   - Key Vault URL: Execute `terraform output keyvault_uri`
+#
+# Exemplo: Se o sufixo gerado for "abc123", os valores seriam:
+#   - ACR: acririsprodabc123.azurecr.io
+#   - Storage: stirisprodabc123
+#   - Key Vault: https://kv-iris-prod-abc123.vault.azure.net/
+# ============================================
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: iris-ml
+
+resources:
+  - ../../base
+  - external-secret.yaml
+
+commonLabels:
+  environment: prod
+
+# Image configuration for prod
+# NOTA: Atualize 'newName' com o nome do ACR após terraform apply
+images:
+  - name: api-gateway
+    newName: acririsprod.azurecr.io/iris/api-gateway  # TODO: Atualizar com sufixo
+    newTag: latest
+  - name: inference-service
+    newName: acririsprod.azurecr.io/iris/inference-service  # TODO: Atualizar com sufixo
+    newTag: latest
+
+# Patches for prod environment
+patches:
+  # Production replicas
+  - target:
+      kind: Deployment
+      name: api-gateway
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 3
+  - target:
+      kind: Deployment
+      name: inference-service
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 3
+  # Production resource limits
+  - target:
+      kind: Deployment
+      name: api-gateway
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: 500m
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: 512Mi
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: "1"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: 1Gi
+  - target:
+      kind: Deployment
+      name: inference-service
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: 500m
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: 512Mi
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: "1"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: 1Gi
+  # Production HPA settings
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: api-gateway
+    patch: |
+      - op: replace
+        path: /spec/minReplicas
+        value: 3
+      - op: replace
+        path: /spec/maxReplicas
+        value: 10
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: inference-service
+    patch: |
+      - op: replace
+        path: /spec/minReplicas
+        value: 3
+      - op: replace
+        path: /spec/maxReplicas
+        value: 10
+  # Production PDB
+  - target:
+      kind: PodDisruptionBudget
+      name: api-gateway
+    patch: |
+      - op: replace
+        path: /spec/minAvailable
+        value: 2
+  - target:
+      kind: PodDisruptionBudget
+      name: inference-service
+    patch: |
+      - op: replace
+        path: /spec/minAvailable
+        value: 2
+
+# ConfigMap patches for prod
+# NOTA: Atualize STORAGE_ACCOUNT com o nome correto após terraform apply
+patches:
+  - target:
+      kind: ConfigMap
+      name: model-config
+    patch: |
+      - op: replace
+        path: /data/STORAGE_ACCOUNT
+        value: "stirisprod"
+      - op: replace
+        path: /data/MODEL_VERSION
+        value: "1.0.0"

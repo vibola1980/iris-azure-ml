@@ -1,0 +1,45 @@
+spring:
+  application:
+    name: iris-api-gateway
+  jmx:
+    enabled: false
+
+# Server configuration
+server:
+  port: 8080
+  error:
+    include-message: always
+    include-binding-errors: always
+
+# Actuator (health checks + metrics)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# Application properties
+iris:
+  model:
+    version: ${MODEL_VERSION:1.0.0}
+    path: ${MODEL_PATH:models/model.pkl}
+  inference:
+    service:
+      url: ${INFERENCE_SERVICE_URL:http://localhost:5000}
+  api:
+    key: ${API_KEY:}
+
+# Logging
+logging:
+  level:
+    root: INFO
+    com.iris: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %logger{36} - %level - %msg%n"

@@ -1,0 +1,98 @@
+# ============================================
+# ArgoCD Application - Iris ML DEV
+# Sincroniza automaticamente com o GitHub
+# Image Updater habilitado para auto-update
+# ============================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: iris-ml-dev
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: iris-ml
+    environment: dev
+  # ==========================================
+  # ARGOCD IMAGE UPDATER ANNOTATIONS
+  # ==========================================
+  annotations:
+    # Lista de imagens para monitorar (separadas por virgula)
+    argocd-image-updater.argoproj.io/image-list: |
+      api-gateway=acririsdev.azurecr.io/iris/api-gateway,
+      inference-service=acririsdev.azurecr.io/iris/inference-service
+
+    # Estrategia de update: semver, latest, digest
+    argocd-image-updater.argoproj.io/api-gateway.update-strategy: semver
+    argocd-image-updater.argoproj.io/inference-service.update-strategy: semver
+
+    # Filtro de versao (aceita apenas tags semver)
+    argocd-image-updater.argoproj.io/api-gateway.allow-tags: regexp:^[0-9]+\.[0-9]+\.[0-9]+$
+    argocd-image-updater.argoproj.io/inference-service.allow-tags: regexp:^[0-9]+\.[0-9]+\.[0-9]+$
+
+    # Metodo write-back: onde salvar a nova tag
+    # git = commit no repositorio (recomendado)
+    argocd-image-updater.argoproj.io/write-back-method: git:secret:argocd/git-credentials
+    argocd-image-updater.argoproj.io/write-back-target: kustomization
+
+    # Branch para commits
+    argocd-image-updater.argoproj.io/git-branch: master
+
+  # Finalizer para limpeza dos recursos quando app for deletada
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  # Projeto (define permissoes)
+  project: iris-ml
+
+  # Fonte: repositorio Git
+  source:
+    repoURL: https://github.com/vibola1980/iris-azure-ml.git
+    targetRevision: master  # ou HEAD para sempre pegar o mais recente
+    path: v4/k8s/overlays/dev
+
+  # Destino: cluster Kubernetes
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: iris-ml
+
+  # Politica de sync
+  syncPolicy:
+    # Sync automatico quando Git mudar
+    automated:
+      # Criar namespace se nao existir
+      prune: true
+      # Deletar recursos que nao estao no Git
+      selfHeal: true
+      # Permitir namespaces vazios
+      allowEmpty: false
+
+    # Opcoes de sync
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+
+    # Retry em caso de falha
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+
+  # Ignorar diferencas em campos que mudam dinamicamente
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
+    - group: ""
+      kind: Service
+      jsonPointers:
+        - /spec/clusterIP
+
+  # Informacoes adicionais (aparecem na UI)
+  info:
+    - name: "Documentacao"
+      value: "https://github.com/vibola1980/iris-azure-ml/tree/master/v4/docs"
+    - name: "Ambiente"
+      value: "Desenvolvimento"

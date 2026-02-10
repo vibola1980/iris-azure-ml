@@ -1,0 +1,12 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: inference-service
+  namespace: iris-ml
+  labels:
+    app: inference-service
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: inference-service
