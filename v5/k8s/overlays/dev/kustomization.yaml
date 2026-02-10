@@ -29,10 +29,10 @@ commonLabels:
 images:
   - name: api-gateway
     newName: acririsdev.azurecr.io/iris/api-gateway
-    newTag: "1.0.0"
+    newTag: "v1"
   - name: inference-service
     newName: acririsdev.azurecr.io/iris/inference-service
-    newTag: "1.0.0"
+    newTag: "v1"
 
 # Patches for dev environment
 patches:
@@ -89,7 +89,10 @@ patches:
     patch: |
       - op: replace
         path: /data/STORAGE_ACCOUNT
-        value: "stirisdevxjrpx1"
+        value: "stirisdevXXXXXX"
       - op: replace
         path: /data/MODEL_VERSION
-        value: "1.1.0-dev"
+        value: "1"
+      - op: replace
+        path: /data/MODEL_BLOB_NAME
+        value: "iris-classifier/v1/model.pkl"

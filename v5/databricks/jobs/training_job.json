@@ -10,7 +10,7 @@
       "task_key": "data_ingestion",
       "description": "Load Iris dataset into Delta Table",
       "notebook_task": {
-        "notebook_path": "/Repos/iris-ml/v5/databricks/notebooks/01_data_ingestion"
+        "notebook_path": "/Users/viniciuspolmil@gmail.com/iris-ml-v5/01_data_ingestion"
       },
       "new_cluster": {
         "spark_version": "14.3.x-scala2.12",
@@ -24,17 +24,20 @@
     },
     {
       "task_key": "automl_training",
-      "description": "Run AutoML classification and register best model",
+      "description": "Run multi-model classification and register best model",
       "depends_on": [
         { "task_key": "data_ingestion" }
       ],
       "notebook_task": {
-        "notebook_path": "/Repos/iris-ml/v5/databricks/notebooks/02_automl_training"
+        "notebook_path": "/Users/viniciuspolmil@gmail.com/iris-ml-v5/02_automl_training",
+        "base_parameters": {
+          "feature_set": "{{feature_set}}"
+        }
       },
       "new_cluster": {
-        "spark_version": "14.3.x-ml-scala2.12",
+        "spark_version": "14.3.x-scala2.12",
         "node_type_id": "Standard_D4s_v3",
-        "num_workers": 1,
+        "num_workers": 0,
         "spark_conf": {
           "spark.databricks.cluster.profile": "singleNode",
           "spark.master": "local[*]"
@@ -48,9 +51,9 @@
         { "task_key": "automl_training" }
       ],
       "notebook_task": {
-        "notebook_path": "/Repos/iris-ml/v5/databricks/notebooks/03_model_export",
+        "notebook_path": "/Users/viniciuspolmil@gmail.com/iris-ml-v5/03_model_export",
         "base_parameters": {
-          "storage_account": "{{storage_account_name}}",
+          "storage_connection_string": "{{storage_connection_string}}",
           "storage_container": "models"
         }
       },

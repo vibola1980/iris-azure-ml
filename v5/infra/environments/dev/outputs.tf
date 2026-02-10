@@ -59,13 +59,13 @@ output "application_insights_connection_string" {
   sensitive   = true
 }
 
-# Databricks outputs
+# Databricks outputs (only when enable_databricks = true)
 output "databricks_workspace_url" {
   description = "Databricks workspace URL"
-  value       = module.databricks.workspace_url
+  value       = var.enable_databricks ? module.databricks[0].workspace_url : "N/A (using Community Edition)"
 }
 
 output "databricks_workspace_name" {
   description = "Databricks workspace name"
-  value       = module.databricks.workspace_name
+  value       = var.enable_databricks ? module.databricks[0].workspace_name : "N/A"
 }

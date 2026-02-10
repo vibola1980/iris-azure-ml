@@ -1,37 +1,50 @@
 #!/bin/bash
 # ============================================
 # Init Container: Download model from Azure Blob Storage
-# Uses Managed Identity (Workload Identity) for authentication
+#
+# Auth modes (auto-detected):
+#   1. Connection string (STORAGE_CONNECTION_STRING) - for demo/dev
+#   2. Managed Identity (Workload Identity on AKS) - for production
 # ============================================
 
 set -euo pipefail
 
 MODEL_DIR="/models"
-STORAGE_ACCOUNT="${STORAGE_ACCOUNT:?STORAGE_ACCOUNT is required}"
 STORAGE_CONTAINER="${STORAGE_CONTAINER:-models}"
 MODEL_BLOB_NAME="${MODEL_BLOB_NAME:?MODEL_BLOB_NAME is required}"
 
 echo "=== Model Download Init Container ==="
-echo "Storage Account: ${STORAGE_ACCOUNT}"
 echo "Container:       ${STORAGE_CONTAINER}"
 echo "Blob:            ${MODEL_BLOB_NAME}"
 echo "Target:          ${MODEL_DIR}/model.pkl"
 
-# Login using managed identity (workload identity on AKS)
-echo "Authenticating with Managed Identity..."
-az login --identity --allow-no-subscriptions --output none 2>/dev/null || {
-    echo "WARN: Managed Identity login failed, trying existing credentials..."
-}
+if [ -n "${STORAGE_CONNECTION_STRING:-}" ]; then
+    # Mode 1: Connection string (demo/dev)
+    echo "Auth mode:       Connection String"
+    az storage blob download \
+        --connection-string "${STORAGE_CONNECTION_STRING}" \
+        --container-name "${STORAGE_CONTAINER}" \
+        --name "${MODEL_BLOB_NAME}" \
+        --file "${MODEL_DIR}/model.pkl" \
+        --output none
+else
+    # Mode 2: Managed Identity (production)
+    STORAGE_ACCOUNT="${STORAGE_ACCOUNT:?STORAGE_ACCOUNT or STORAGE_CONNECTION_STRING is required}"
+    echo "Auth mode:       Managed Identity"
+    echo "Storage Account: ${STORAGE_ACCOUNT}"
 
-# Download model from Blob Storage
-echo "Downloading model..."
-az storage blob download \
-    --account-name "${STORAGE_ACCOUNT}" \
-    --container-name "${STORAGE_CONTAINER}" \
-    --name "${MODEL_BLOB_NAME}" \
-    --file "${MODEL_DIR}/model.pkl" \
-    --auth-mode login \
-    --output none
+    az login --identity --allow-no-subscriptions --output none 2>/dev/null || {
+        echo "WARN: Managed Identity login failed, trying existing credentials..."
+    }
+
+    az storage blob download \
+        --account-name "${STORAGE_ACCOUNT}" \
+        --container-name "${STORAGE_CONTAINER}" \
+        --name "${MODEL_BLOB_NAME}" \
+        --file "${MODEL_DIR}/model.pkl" \
+        --auth-mode login \
+        --output none
+fi
 
 # Verify download
 if [ -f "${MODEL_DIR}/model.pkl" ]; then

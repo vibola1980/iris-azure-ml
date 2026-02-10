@@ -53,12 +53,22 @@ spec:
                 configMapKeyRef:
                   name: model-config
                   key: MODEL_BLOB_NAME
+            - name: STORAGE_CONNECTION_STRING
+              valueFrom:
+                secretKeyRef:
+                  name: iris-ml-secrets
+                  key: storage-connection-string
+                  optional: true
+            - name: AZURE_CONFIG_DIR
+              value: "/tmp/.azure"
           volumeMounts:
             - name: model-volume
               mountPath: /models
             - name: init-scripts
               mountPath: /scripts
               readOnly: true
+            - name: tmp
+              mountPath: /tmp
           resources:
             requests:
               cpu: 100m

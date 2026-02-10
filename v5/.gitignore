@@ -102,3 +102,7 @@ credentials.json
 service-account.json
 *.pem
 *.key
+
+# Demo
+.demo-env
+.demo-results-*

@@ -10,7 +10,8 @@
 #   make deploy-dev    Deploy to dev environment
 #
 
-.PHONY: help dev build test clean deploy-dev deploy-prod train lint docker-up docker-down
+.PHONY: help dev build test clean deploy-dev deploy-prod train lint docker-up docker-down \
+       demo-provision demo-train-v1 demo-deploy demo-test demo-train-v2 demo-redeploy demo-cleanup
 
 # Default target
 .DEFAULT_GOAL := help
@@ -224,6 +225,45 @@ predict: ## Make a sample prediction
 	curl -s -X POST http://localhost:8080/predict \
 		-H "Content-Type: application/json" \
 		-d '{"sepal_length": 5.1, "sepal_width": 3.5, "petal_length": 1.4, "petal_width": 0.2}' | jq .
+
+# ============================================
+# Setup
+# ============================================
+
+# ============================================
+# Demo E2E (live presentation)
+# ============================================
+# Pre-requisitos:
+#   cp scripts/demo/demo.env.example .demo-env
+#   # Preencha DATABRICKS_HOST, DATABRICKS_TOKEN, API_KEY
+#
+# Ordem de execucao:
+#   make demo-provision   → Terraform (AKS, ACR, Storage)
+#   make demo-train-v1    → Databricks (sepal_only, modelo v1)
+#   make demo-deploy      → Build + Push ACR + Deploy AKS
+#   make demo-test        → curl predicoes (probabilidades dispersas)
+#   make demo-train-v2    → Databricks (all_features) + Redeploy
+#   make demo-test        → curl predicoes (probabilidades concentradas)
+#   make demo-cleanup     → Terraform destroy
+# ============================================
+
+demo-provision: ## [Demo] Ato 2: Provisionar infra Azure (Terraform)
+	@bash scripts/demo/01_provision.sh
+
+demo-train-v1: ## [Demo] Ato 3: Treinar modelo v1 (sepal_only, 2 features)
+	@bash scripts/demo/02_train.sh sepal_only 1
+
+demo-deploy: ## [Demo] Ato 4: Build, push ACR, deploy AKS
+	@bash scripts/demo/03_deploy.sh
+
+demo-test: ## [Demo] Ato 5: Testar predicoes na API
+	@bash scripts/demo/04_test.sh
+
+demo-train-v2: ## [Demo] Ato 6: Retreinar v2 (all_features) + redeploy
+	@bash scripts/demo/05_retrain.sh
+
+demo-cleanup: ## [Demo] Ato 7: Destruir todos recursos Azure
+	@bash scripts/demo/06_cleanup.sh
 
 # ============================================
 # Setup

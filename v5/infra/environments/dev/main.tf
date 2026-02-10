@@ -203,6 +203,7 @@ resource "azurerm_role_assignment" "aks_storage" {
 # ============================================
 
 module "databricks" {
+  count  = var.enable_databricks ? 1 : 0
   source = "../../modules/databricks"
 
   project_name        = local.project_name

@@ -20,6 +20,12 @@ variable "alert_email_addresses" {
   default     = []
 }
 
+variable "enable_databricks" {
+  description = "Enable Azure Databricks workspace (false = use Community Edition)"
+  type        = bool
+  default     = false
+}
+
 variable "databricks_sku" {
   description = "Databricks workspace SKU (standard, premium, trial)"
   type        = string
