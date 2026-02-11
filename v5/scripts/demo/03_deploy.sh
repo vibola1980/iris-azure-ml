@@ -3,6 +3,7 @@
 # Demo Ato 4: Build, Push e Deploy no AKS
 # ============================================
 # Builds Docker images, pushes to ACR, deploys to AKS
+# Usa overlay temporario para NAO modificar arquivos git-tracked
 # ============================================
 
 set -euo pipefail
@@ -21,13 +22,14 @@ STORAGE_ACCOUNT="${STORAGE_ACCOUNT:?Run 01_provision.sh first}"
 STORAGE_CONNECTION_STRING="${STORAGE_CONNECTION_STRING:?Run 01_provision.sh first}"
 API_KEY="${API_KEY:-demo-key-2025}"
 MODEL_VERSION="${1:-1}"
+MODEL_BLOB="iris-classifier/v${MODEL_VERSION}/model.pkl"
 
 echo "============================================"
 echo " Ato 4: Build, Push e Deploy"
 echo "============================================"
 echo "  ACR:     $ACR_LOGIN_SERVER"
 echo "  AKS:     $AKS_CLUSTER_NAME"
-echo "  Model:   v$MODEL_VERSION"
+echo "  Model:   v$MODEL_VERSION ($MODEL_BLOB)"
 echo ""
 
 # --- Build Docker images ---
@@ -54,29 +56,42 @@ echo ""
 echo "--- Configurando AKS ---"
 az aks get-credentials --resource-group "$RESOURCE_GROUP" --name "$AKS_CLUSTER_NAME" --overwrite-existing
 
-# --- Update K8s overlay with real values ---
+# --- Create namespace ---
 echo ""
-echo "--- Atualizando K8s manifests ---"
-OVERLAY_DIR="$PROJECT_DIR/k8s/overlays/dev"
-KUSTOMIZATION="$OVERLAY_DIR/kustomization.yaml"
-SECRETS="$OVERLAY_DIR/secrets.yaml"
+echo "--- Criando namespace iris-ml ---"
+kubectl create namespace iris-ml 2>/dev/null || true
+
+# --- Create temporary overlay (do NOT modify git-tracked files) ---
+echo ""
+echo "--- Criando overlay temporario ---"
+TEMP_DIR=$(mktemp -d)
+trap "rm -rf $TEMP_DIR" EXIT
+
+# Copy overlay files to temp dir
+cp "$PROJECT_DIR/k8s/overlays/dev/kustomization.yaml" "$TEMP_DIR/kustomization.yaml"
+
+# Fix base path: relative ../../base -> absolute path
+sed -i "s|../../base|${PROJECT_DIR}/k8s/base|g" "$TEMP_DIR/kustomization.yaml"
 
 # Update ACR image references
-sed -i "s|acririsdev.azurecr.io|${ACR_LOGIN_SERVER}|g" "$KUSTOMIZATION"
+sed -i "s|acririsdev.azurecr.io|${ACR_LOGIN_SERVER}|g" "$TEMP_DIR/kustomization.yaml"
+sed -i "s|acririsdevXXXXXX.azurecr.io|${ACR_LOGIN_SERVER}|g" "$TEMP_DIR/kustomization.yaml"
+
 # Update image tags
-sed -i "s|newTag: \"1.0.0\"|newTag: \"v${MODEL_VERSION}\"|g" "$KUSTOMIZATION"
+sed -i "s|newTag: \"v1\"|newTag: \"v${MODEL_VERSION}\"|g" "$TEMP_DIR/kustomization.yaml"
+sed -i "s|newTag: \"1.0.0\"|newTag: \"v${MODEL_VERSION}\"|g" "$TEMP_DIR/kustomization.yaml"
+
 # Update storage account
-sed -i "s|value: \"stirisdevxjrpx1\"|value: \"${STORAGE_ACCOUNT}\"|g" "$KUSTOMIZATION"
-# Update model blob name
-MODEL_BLOB="iris-classifier/v${MODEL_VERSION}/model.pkl"
+sed -i "s|stirisdevXXXXXX|${STORAGE_ACCOUNT}|g" "$TEMP_DIR/kustomization.yaml"
+sed -i "s|stirisdevxjrpx1|${STORAGE_ACCOUNT}|g" "$TEMP_DIR/kustomization.yaml"
 
-# Add model blob name patch if not present, or update existing
-if grep -q "MODEL_BLOB_NAME" "$KUSTOMIZATION"; then
-    sed -i "s|path: /data/MODEL_BLOB_NAME|path: /data/MODEL_BLOB_NAME|g" "$KUSTOMIZATION"
-fi
+# Update model blob name and version
+sed -i "s|iris-classifier/v1/model.pkl|${MODEL_BLOB}|g" "$TEMP_DIR/kustomization.yaml"
+sed -i "s|iris-classifier/v1.0.0/model.pkl|${MODEL_BLOB}|g" "$TEMP_DIR/kustomization.yaml"
+sed -i 's|value: "1"|value: "'"v${MODEL_VERSION}"'"|g' "$TEMP_DIR/kustomization.yaml"
 
-# Update secrets with real values
-cat > "$SECRETS" <<EOF
+# Generate secrets.yaml in temp dir with real values
+cat > "$TEMP_DIR/secrets.yaml" <<SECEOF
 apiVersion: v1
 kind: Secret
 metadata:
@@ -87,19 +102,15 @@ metadata:
 type: Opaque
 stringData:
   api-key: "${API_KEY}"
-  storage-connection-string: "${STORAGE_CONNECTION_STRING}"
-EOF
-echo "  Overlay atualizado com valores reais"
+  storage-connection-string: '${STORAGE_CONNECTION_STRING}'
+SECEOF
 
-# Update base configmap with correct blob name
-CONFIGMAP="$PROJECT_DIR/k8s/base/common/configmap.yaml"
-sed -i "s|MODEL_BLOB_NAME:.*|MODEL_BLOB_NAME: \"${MODEL_BLOB}\"|g" "$CONFIGMAP"
-sed -i "s|MODEL_VERSION:.*|MODEL_VERSION: \"v${MODEL_VERSION}\"|g" "$CONFIGMAP"
+echo "  Overlay temporario criado em: $TEMP_DIR"
 
 # --- Deploy ---
 echo ""
 echo "--- Deploying to AKS ---"
-kubectl apply -k "$OVERLAY_DIR"
+kubectl apply -k "$TEMP_DIR"
 
 echo ""
 echo "--- Aguardando pods ficarem prontos ---"
@@ -113,15 +124,32 @@ kubectl get pods -n iris-ml
 echo ""
 kubectl get svc -n iris-ml
 
-# Get external IP
+# --- Wait for External IP ---
+echo ""
+echo "--- Aguardando External IP ---"
+MAX_WAIT=120
+WAITED=0
+EXTERNAL_IP=""
+while [ "$WAITED" -lt "$MAX_WAIT" ]; do
+    EXTERNAL_IP=$(kubectl get svc api-gateway-external -n iris-ml \
+        -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
+    if [ -n "$EXTERNAL_IP" ]; then
+        break
+    fi
+    echo "  Aguardando IP... (${WAITED}s)"
+    sleep 10
+    WAITED=$((WAITED + 10))
+done
+
 echo ""
 echo "============================================"
 echo " Deploy Completo"
 echo "============================================"
-EXTERNAL_IP=$(kubectl get svc api-gateway -n iris-ml -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "pending")
-echo "  API: http://${EXTERNAL_IP}/api/v1/predict"
+if [ -n "$EXTERNAL_IP" ]; then
+    echo "  API: http://${EXTERNAL_IP}/predict"
+else
+    echo "  API: IP ainda pendente (aguarde e execute):"
+    echo "    kubectl get svc api-gateway-external -n iris-ml -w"
+fi
 echo "  Model: v${MODEL_VERSION} (${MODEL_BLOB})"
-echo ""
-echo "  Se IP=pending, aguarde e execute:"
-echo "    kubectl get svc api-gateway -n iris-ml -w"
 echo "============================================"

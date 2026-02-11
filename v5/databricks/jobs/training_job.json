@@ -1,10 +1,15 @@
 {
-  "name": "iris-automl-training",
+  "name": "iris-automl-training-v5",
   "description": "End-to-end Iris model training pipeline: ingest data, run AutoML, export model to Blob Storage",
   "tags": {
     "project": "iris-ml-v5",
     "team": "ml-engineering"
   },
+  "parameters": [
+    { "name": "feature_set", "default": "sepal_only" },
+    { "name": "model_version", "default": "1" },
+    { "name": "storage_connection_string", "default": "" }
+  ],
   "tasks": [
     {
       "task_key": "data_ingestion",
@@ -31,7 +36,8 @@
       "notebook_task": {
         "notebook_path": "/Users/viniciuspolmil@gmail.com/iris-ml-v5/02_automl_training",
         "base_parameters": {
-          "feature_set": "{{feature_set}}"
+          "feature_set": "{{job.parameters.feature_set}}",
+          "model_version": "{{job.parameters.model_version}}"
         }
       },
       "new_cluster": {
@@ -53,7 +59,7 @@
       "notebook_task": {
         "notebook_path": "/Users/viniciuspolmil@gmail.com/iris-ml-v5/03_model_export",
         "base_parameters": {
-          "storage_connection_string": "{{storage_connection_string}}",
+          "storage_connection_string": "{{job.parameters.storage_connection_string}}",
           "storage_container": "models"
         }
       },

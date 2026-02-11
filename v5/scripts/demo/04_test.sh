@@ -15,20 +15,39 @@ ENV_FILE="$PROJECT_DIR/.demo-env"
 source "$ENV_FILE"
 API_KEY="${API_KEY:-demo-key-2025}"
 
-# Get external IP
-EXTERNAL_IP=$(kubectl get svc api-gateway -n iris-ml -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
+# Wait for External IP with retry
+echo "--- Obtendo External IP ---"
+MAX_WAIT=120
+WAITED=0
+EXTERNAL_IP=""
+while [ "$WAITED" -lt "$MAX_WAIT" ]; do
+    EXTERNAL_IP=$(kubectl get svc api-gateway-external -n iris-ml \
+        -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
+    if [ -n "$EXTERNAL_IP" ]; then
+        break
+    fi
+    echo "  Aguardando IP... (${WAITED}s)"
+    sleep 10
+    WAITED=$((WAITED + 10))
+done
+
 if [ -z "$EXTERNAL_IP" ]; then
-    echo "ERRO: External IP nao disponivel ainda."
-    echo "Execute: kubectl get svc api-gateway -n iris-ml -w"
+    echo "ERRO: External IP nao disponivel apos ${MAX_WAIT}s."
+    echo "Execute: kubectl get svc api-gateway-external -n iris-ml -w"
     exit 1
 fi
 
 API_URL="http://${EXTERNAL_IP}"
 
-# Detect model version from API
-MODEL_VERSION=$(curl -s "${API_URL}/health/ready" \
+# Detect model version from API (try both camelCase and snake_case)
+MODEL_VERSION=$(curl -s -m 10 "${API_URL}/health/ready" \
     -H "X-API-Key: ${API_KEY}" \
-    | python -c "import sys,json; print(json.load(sys.stdin).get('model_version','unknown'))" 2>/dev/null || echo "unknown")
+    | python -c "
+import sys, json
+data = json.load(sys.stdin)
+v = data.get('modelVersion', data.get('model_version', 'unknown'))
+print(v)
+" 2>/dev/null || echo "unknown")
 
 RESULTS_FILE="$PROJECT_DIR/.demo-results-${MODEL_VERSION}.json"
 
@@ -40,7 +59,8 @@ echo ""
 
 # Health check
 echo "--- Health Check ---"
-curl -s "${API_URL}/health/ready" | python -m json.tool
+curl -s -m 10 "${API_URL}/health/ready" \
+    -H "X-API-Key: ${API_KEY}" | python -m json.tool
 echo ""
 
 # Define test cases
@@ -60,7 +80,7 @@ for i in 0 1 2; do
     echo "--- Predicao $((i+1)): ${LABELS[$i]} ---"
     echo "  Input: ${COORDS[$i]}"
 
-    RESULT=$(curl -s -X POST "${API_URL}/predict" \
+    RESULT=$(curl -s -m 10 -X POST "${API_URL}/predict" \
         -H "Content-Type: application/json" \
         -H "X-API-Key: ${API_KEY}" \
         -d "${INPUTS[$i]}")
